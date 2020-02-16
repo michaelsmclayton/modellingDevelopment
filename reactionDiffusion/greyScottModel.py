@@ -5,8 +5,9 @@ from matplotlib.animation import FuncAnimation
 from scipy.sparse import spdiags 
 
 # Parameters
-N = 150
-spotSize = int(4/2)
+N = 250
+reflectiveBorders = True
+spotSize = int(2/2)
 typeOfInterest = 'spirals'
 getRandom = lambda low, high : np.random.uniform(low,high)
 parameters = {
@@ -16,6 +17,11 @@ parameters = {
     'bacteria': {'Du': 0.14, 'Dv': 0.06, 'F': 0.035, 'K': 0.065},
     'random': {'Du': getRandom(.12,.18), 'Dv': getRandom(.04,.10), 'F': getRandom(.02,.08), 'K': getRandom(.04,.07)}
 }
+convMatrix = [
+    [0, 1, 0],
+    [1, -4, 1],
+    [0, 1, 0]
+]
 
 class GrayScott():
     """Class to solve Gray-Scott Reaction-Diffusion equation"""
@@ -26,30 +32,44 @@ class GrayScott():
         self.N = N
         self.u = np.ones((N, N), dtype=np.float128) # set all molecule u to 1
         self.v = np.zeros((N, N), dtype=np.float128) # set all molecule v to 0
-        self.laplacianResult = []
+        self.laplacianMatrix = []
 
     # Function to inject some v into the initial system
     def initialise(self):
         """Setting up the initial condition"""
-        N, halfPoint, injectSize = self.N, np.int(self.N/2), spotSize
+        N, halfPoint = self.N, np.int(self.N/2)
         self.laplacian()
         # self.u += 0.02*np.random.random((N,N))
         # self.v += 0.02*np.random.random((N,N))
-        lowInx, highInx = halfPoint-injectSize, halfPoint+injectSize
-        self.u[lowInx:highInx, lowInx:highInx] = 0.50
-        self.v[lowInx:highInx, lowInx:highInx] = 0.25
+        lowInx, highInx = halfPoint-spotSize, halfPoint+spotSize
+        self.u[lowInx:highInx, lowInx:highInx] = 0.0
+        self.v[lowInx:highInx, lowInx:highInx] = 1.0
         return  
     
     # Laplacian
     def laplacian(self):
         """Construct a sparse matrix that applies the 5-point discretization"""
-        N = self.N
-        e = np.ones(N**2)
-        e2 = ([1]*(N-1)+[0])*N
-        e3 = ([0]+[1]*(N-1))*N
-        A = spdiags([-4*e,e2,e3,e,e],[0,-1,1,-N,N],N**2,N**2)
-        self.laplacianResult = A
+
+        # Get convolution matrix to get Laplacian
+        def getLaplacianConvMatrix(N):
+            e = np.ones(N**2)
+            diagonal = convMatrix[1][1]*e
+            if reflectiveBorders==True:
+                left = ([convMatrix[1][0]]*(N-1)+[0]) * N
+                right = ([0]+[convMatrix[1][2]]*(N-1)) * N
+            else:
+                left = convMatrix[1][0]*e
+                right = convMatrix[1][2]*e
+            top = convMatrix[0][1]*e
+            bottom = convMatrix[2][1]*e
+            fullConvMatrix = [diagonal, left, right, top, bottom]
+            return fullConvMatrix
+
+        # Return laplacian multiplication mtarix
+        fullConvMatrix = getLaplacianConvMatrix(self.N)
+        self.laplacianMatrix = spdiags(data=fullConvMatrix, diags=[0,-1,1,-N,N], m=N**2, n=N**2)
         return
+
 
     # Integrate
     def integrate(self):
@@ -57,7 +77,7 @@ class GrayScott():
 
         # evolve in time using Euler method
         Du, Dv, F, K = self.parameters['Du'], self.parameters['Dv'], self.parameters['F'], self.parameters['K']
-        L = self.laplacianResult
+        L = self.laplacianMatrix
         u = self.u.reshape((N*N))
         v = self.v.reshape((N*N))
 
@@ -97,7 +117,6 @@ def update(frame):
     for i in range(5): # Integrate many times before drawing to screen
         rdSolver.integrate()
     display.set_array(rdSolver.u)
-    # sp.pcolormesh(rdSolver.u.reshape((N, N)), cmap=plt.cm.RdBu)
     return display
 
 # Animate
