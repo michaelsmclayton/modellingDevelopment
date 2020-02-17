@@ -1,7 +1,8 @@
 from __future__ import division
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+# matplotlib.use("Agg")
+import matplotlib.animation as animation
+import numpy as np
 from scipy.sparse import spdiags 
 
 # Parameters
@@ -105,6 +106,10 @@ class GrayScott():
 rdSolver = GrayScott(N, parameters[typeOfInterest])
 rdSolver.initialise()
 
+# Set up formatting for the movie files
+Writer = animation.writers['ffmpeg']
+writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+
 # Setup figure
 fig = plt.figure(figsize=(5, 5), facecolor='w', edgecolor='k') # dpi=400,
 fig.canvas.mpl_connect('button_press_event', rdSolver.onClick) 
@@ -120,5 +125,6 @@ def update(frame):
     return display
 
 # Animate
-ani = FuncAnimation(fig, update, interval=1)
+ani = animation.FuncAnimation(fig, update, interval=1, frames=10000, repeat=False)
+# ani.save('greyScott_%s.mp4' % (typeOfInterest), writer=writer) # may require 'brew install' of 'brew update' of ffmpeg'
 plt.show()
