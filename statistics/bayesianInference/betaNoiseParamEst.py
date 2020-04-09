@@ -16,7 +16,7 @@ observed, generated samples.
 # Generate data
 # -------------------------
 print('\nGenerating data...')
-nOfSamples = 1000
+nOfSamples = 5
 
 # True parameter values (for beta distribution)
 alpha_true = np.random.uniform(0,5)
@@ -31,11 +31,16 @@ data = np.random.beta(alpha_true, beta_true, size=nOfSamples)
 print('Specifying model ...')
 basicModel = pm.Model()
 with basicModel:
+    
     # Priors
     alpha = pm.Uniform('alpha', 0, 6)
     beta = pm.Uniform('beta', 0, 6)
+    
     # Likelihood
     likelihood = pm.Beta('likelihood', alpha, beta, observed=data)
+
+    # trace = pm.sample(2)
+
 
 # ---------------------------------
 # Model fitting
