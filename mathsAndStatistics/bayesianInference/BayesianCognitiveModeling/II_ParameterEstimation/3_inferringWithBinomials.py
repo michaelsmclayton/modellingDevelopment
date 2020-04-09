@@ -5,11 +5,18 @@ import scipy.stats as stats
 from scipy.stats.kde import gaussian_kde
 
 # Global variables
-sectionToRun = 3 # 1: inferringARate, 2: differenceBetweenRates, 3: inferringCommonRate
+sectionToRun = 4 # 1: inferringARate, 2: differenceBetweenRates, 3: inferringCommonRate, 4: priorAndPosterior
 
 # Function to render graphical model
 def renderGraphicalModel(model):
     pm.model_to_graphviz(model).render(filename='model', view=True, cleanup=True)
+
+# Plot posterior distribution
+def plotPosteriorDistribution(trace,x=np.linspace(0,1,100)):
+    posteriorDist = gaussian_kde(trace)
+    plt.hist(trace, bins=100, normed=1, alpha=.3)
+    plt.plot(x, posteriorDist(x), 'r') # distribution function
+    plt.show()
 
 # ------------------------------------------------------------
 # 3.1 Inferring a rate
@@ -36,13 +43,10 @@ if sectionToRun == 1: # inferringARate
 
     # Define model
     with pm.Model() as model:
-
         # prior
         θ = pm.Beta('θ', alpha=1, beta=1)
-        
         # observed (i.e. likelihood of observed value assuming a binomial distribution with a rate of θ and n questions)
         x = pm.Binomial('x', n=n, p=θ, observed=k)
-        
         # inference
         trace = pm.sample()
 
@@ -50,11 +54,7 @@ if sectionToRun == 1: # inferringARate
     renderGraphicalModel(model)
 
     # Plot posterior distribution
-    posteriorDist = gaussian_kde(trace['θ'])
-    x = np.linspace(0,1,100)
-    plt.hist(trace['θ'], bins=100, normed=1, alpha=.3)
-    plt.plot(x, posteriorDist(x), 'r') # distribution function
-    plt.show()
+    plotPosteriorDistribution(trace['θ'], x)
 
 
 # ------------------------------------------------------------
@@ -74,36 +74,28 @@ if sectionToRun == 2: # differenceBetweenRates
     n1 = n2 = 10 # Numbers of questions
 
     with pm.Model() as model:
-        
         # prior
         θ1 = pm.Beta('θ1', alpha=1, beta=1)
         θ2 = pm.Beta('θ2', alpha=1, beta=1)
-        
         # observed (i.e. likelihoods)
         x1 = pm.Binomial('x1', n=n1, p=θ1, observed=k1)
         x2 = pm.Binomial('x2', n=n2, p=θ2, observed=k2)
-        
         # differences (as deterministic; which allow you to do algebra with probability distributions)
-        delta = pm.Deterministic('delta', θ1-θ2)
-        
+        δ = pm.Deterministic('δ', θ1-θ2)
         # inference
         trace = pm.sample()
 
     # Render graphical model
     renderGraphicalModel(model)
 
-    #  Plot posterior distribution for delta
-    x = np.linspace(np.min(trace['delta']), np.max(trace['delta']), 100)
-    deltaPosterior = gaussian_kde(trace['delta'])(x)
-    plt.hist(trace['delta'], bins=100, normed=1, alpha=.3)
-    plt.plot(x, deltaPosterior, 'r') # distribution function
-    plt.show()
+    #  Plot posterior distribution for δ
+    x = np.linspace(np.min(trace['δ']), np.max(trace['δ']), 100)
+    plotPosteriorDistribution(trace['δ'], x)
 
 
 # ------------------------------------------------------------
 # 3.3 Inferring a common rate
 # ------------------------------------------------------------
-
 """
 Here, we again observe two binary processes (i.e. two students performing a test), producing k1 and k2 successes (i.e. correct
 answers) out of n1 and n2 trials (questions), respectively. However, now assume the underlying rate (θ) for both is the same.
@@ -120,23 +112,50 @@ if sectionToRun == 3: # inferringCommonRate
     n = np.array([10,10]) # Total number of questions
 
     # Define model
-    with pm.Model() as model3:
-
+    with pm.Model() as model:
         # prior
         θ = pm.Beta('θ', alpha=1, beta=1) # note that there is just one prior this time
-
         # observed (i.e. likelihoods)
         x = pm.Binomial('x', n=n, p=θ, observed=k)
-
         # inference
         trace = pm.sample()
 
     # Render graphical model
-    renderGraphicalModel(model3)
+    renderGraphicalModel(model)
 
     # Plot posterior distribution
-    posteriorDist = gaussian_kde(trace['θ'])
-    x = np.linspace(0,1,100)
-    plt.hist(trace['θ'], bins=100, normed=1, alpha=.3)
-    plt.plot(x, posteriorDist(x), 'r') # distribution function
-    plt.show()
+    plotPosteriorDistribution(trace['θ'])
+
+
+# ------------------------------------------------------------
+# 3.4 Prior and posterior prediction
+# ------------------------------------------------------------
+
+if sectionToRun == 4: # priorAndPosterior
+
+    k = 1
+    n = 15
+    # Uncomment for Trompetter Data
+    # k = 24
+    # n = 121
+
+    # Posterior predictive sampling (i.e. prior only model, with no observation)
+    with pm.Model() as model_prior:
+        # Prior
+        θ = pm.Beta('θ', alpha=1, beta=1) # prior on rate θ
+        x = pm.Binomial('x', n=n, p=θ) # k
+        trace_prior = pm.sample()
+
+    # Visualise
+    renderGraphicalModel(model_prior)
+    plotPosteriorDistribution(trace_prior['θ']) # Plot posterior distribution
+    '''Essentially the posterior, in the absence of data, draws directly from the prior'''
+
+    # # with observation
+    # with pm.Model() as model_obs:
+    #     θ = pm.Beta('θ', alpha=1, beta=1)
+    #     x = pm.Binomial('x', n=n, p=θ, observed=k)
+    #     trace_obs = pm.sample()
+        
+    # # prediction (sample from trace)
+    # ppc = pm.sample_ppc(trace_obs, samples=500, model=model_obs)
