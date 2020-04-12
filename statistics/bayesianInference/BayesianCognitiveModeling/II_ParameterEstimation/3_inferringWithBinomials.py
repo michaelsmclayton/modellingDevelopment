@@ -6,22 +6,23 @@ from matplotlib import gridspec
 import scipy.stats as stats
 from scipy.stats.kde import gaussian_kde
 from scipy import sparse
+import seaborn as sns; sns.set(style="white", color_codes=True)
 # see https://github.com/junpenglao/Bayesian-Cognitive-Modeling-in-Pymc3
 
 # 1:inferringARate, 2:differenceBetweenRates, 3:inferringCommonRate
-# 4:priorAndPosterior, 5:usesOfPosteriorPrediction, 
-sectionToRun = 5
+# 4:priorAndPosterior, 5:usesOfPosteriorPrediction, 6: jointDistributions
+sectionToRun = 6
 
 # Function to render graphical model
 def renderGraphicalModel(model):
     pm.model_to_graphviz(model).render(filename='model', view=True, cleanup=True)
 
 # Plot posterior distribution
-def plotPosteriorDistribution(trace,x=np.linspace(0,1,100)):
+def plotPosteriorDistribution(trace,x=np.linspace(0,1,100),show=True):
     posteriorDist = gaussian_kde(trace)
     plt.hist(trace, bins=100, normed=1, alpha=.3)
     plt.plot(x, posteriorDist(x), 'r') # distribution function
-    plt.show()
+    if show==True: plt.show()
 
 # ------------------------------------------------------------
 # 3.1 Inferring a rate
@@ -191,7 +192,6 @@ colour of each square is proportional to the predictive mass (i.e. frequency) gi
 success count observations. The actual data observed in this example, with 0 and 10 successes for the two counts, are
 shown by the dot. However, this figure shows that posterior predictive distributions do not line up with the actual data
 """
-
 if sectionToRun == 5: # usesOfPosteriorPrediction
 
     # Parameters
@@ -232,3 +232,52 @@ if sectionToRun == 5: # usesOfPosteriorPrediction
     plt.xlabel('Trial1'); plt.ylabel('Trial2')
     plt.tight_layout()
     plt.show()
+
+# ------------------------------------------------------------
+# 3.6 Joint distributions
+# ------------------------------------------------------------
+'''
+So far, we have talked only about trying to reduce uncertainty about a single value (i.e. θ). This means that our
+parameter space has been one-dimensional, and everything learned from data is incorporated into a single probability
+distribution. However, for many real-world problems, there will be more than one unknown variable of interest, and
+they will interact. In the code below, we illustrate this using is a binomial process in which both the rate θ and
+the total number n are unknown, and so the problem is to infer both simultaneously from counts of successes k.
+
+To make the problem concrete, suppose there are five helpers distributing a bun- dle of surveys to houses. It is known
+that each bundle contained the same number of surveys, n, but the number itself is not known. The only available relevant
+information is that the maximum bundle is nmax = 500, and so n must be between 1 and nmax. In this problem, it is also not
+known what the rate of return for the surveys is. But, it is assumed that each helper distributed to houses selected in a
+random enough way that it is reasonable to believe the return rates are the same. It is also assumed to be reasonable to
+set a uniform prior on this common rate θ (using a beta distribution with a,b=1).
+
+In summary, we want to determine:
+n = the number of surveys contained in the bundle given to each distributer
+θ = the rate at which surveys are returns (assumed to be constant across distributers)
+from:
+k = the number of surveys returned for each distributer.
+'''
+if sectionToRun == 6: # jointDistributions
+
+    # Parameters
+    nmax = 500 # maximum number of surverys
+    k = np.array([16, 18, 22, 25, 27])
+    m = len(k) # number of survey distributers
+        
+    # Define model
+    with pm.Model() as model:
+        # prior
+        θ = pm.Beta('θ', alpha=1,beta=1)
+        TotalN = pm.DiscreteUniform('TotalN', lower=1, upper=nmax)
+        # observed
+        x = pm.Binomial('x', n=TotalN, p=θ, observed=k)
+        # inference
+        trace = pm.sample()#1e4, njobs=2)
+
+    # Render graphical model
+    renderGraphicalModel(model)
+
+    # Display joint probability distribution
+    sns.jointplot(trace['TotalN'],trace['θ'])
+    plt.show()
+    '''Note that a joint probability distribution is made of marginal probability distributions'''
+    # plt.hist2d(trace['TotalN'], trace['θ'], bins=50)
