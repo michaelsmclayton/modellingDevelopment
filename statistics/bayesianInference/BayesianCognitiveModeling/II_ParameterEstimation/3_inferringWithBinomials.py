@@ -7,22 +7,15 @@ import scipy.stats as stats
 from scipy.stats.kde import gaussian_kde
 from scipy import sparse
 import seaborn as sns; sns.set(style="white", color_codes=True)
+import sys; sys.path.append("..") # Import common functions
+from pymc3Functions import renderGraphicalModel, plotPosteriorDistribution
 # see https://github.com/junpenglao/Bayesian-Cognitive-Modeling-in-Pymc3
 
-# 1:inferringARate, 2:differenceBetweenRates, 3:inferringCommonRate
-# 4:priorAndPosterior, 5:usesOfPosteriorPrediction, 6: jointDistributions
+# Section to run
+''' 1:inferringARate, 2:differenceBetweenRates, 3:inferringCommonRate
+    4:priorAndPosterior, 5:usesOfPosteriorPrediction, 6: jointDistributions'''
 sectionToRun = 6
 
-# Function to render graphical model
-def renderGraphicalModel(model):
-    pm.model_to_graphviz(model).render(filename='model', view=True, cleanup=True)
-
-# Plot posterior distribution
-def plotPosteriorDistribution(trace,x=np.linspace(0,1,100),show=True):
-    posteriorDist = gaussian_kde(trace)
-    plt.hist(trace, bins=100, normed=1, alpha=.3)
-    plt.plot(x, posteriorDist(x), 'r') # distribution function
-    if show==True: plt.show()
 
 # ------------------------------------------------------------
 # 3.1 Inferring a rate
