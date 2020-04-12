@@ -14,7 +14,7 @@ from pymc3Functions import renderGraphicalModel, plotPosteriorDistribution
 # Section to run
 ''' 1:inferringARate, 2:differenceBetweenRates, 3:inferringCommonRate
     4:priorAndPosterior, 5:usesOfPosteriorPrediction, 6: jointDistributions'''
-sectionToRun = 6
+sectionToRun = 1
 
 
 # ------------------------------------------------------------
@@ -53,7 +53,7 @@ if sectionToRun == 1: # inferringARate
     renderGraphicalModel(model)
 
     # Plot posterior distribution
-    plotPosteriorDistribution(trace['θ'], x)
+    plotPosteriorDistribution(trace['θ'])
     # pm.traceplot(trace, varnames=['θ']);
 
 # ------------------------------------------------------------
