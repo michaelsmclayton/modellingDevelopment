@@ -88,8 +88,7 @@ if sectionToRun == 2: # differenceBetweenRates
     renderGraphicalModel(model)
 
     #  Plot posterior distribution for δ
-    x = np.linspace(np.min(trace['δ']), np.max(trace['δ']), 100)
-    plotPosteriorDistribution(trace['δ'], x)
+    plotPosteriorDistribution(trace['δ'])
 
 
 # ------------------------------------------------------------
