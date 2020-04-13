@@ -9,9 +9,29 @@ from pymc3Functions import renderGraphicalModel, plotPosteriorDistribution
 # see https://github.com/junpenglao/Bayesian-Cognitive-Modeling-in-Pymc3
 
 # Section to run
-''' 1: pearsonCorrelation, 2: pearsonCorrelationWithUncertainty'''
-sectionToRun = 1
+''' 1: pearsonCorrelation; 2: pearsonCorrelationWithUncertainty; 3: kappaAoefficientOfAgreement'''
+sectionToRun = 2
 
+# Function to create linearly correlated dataset
+def createLinearData(α, σ):
+    x = np.random.uniform(low=0, high=10, size=11)
+    y = α * x + (σ*np.random.rand(len(x)))
+    return np.vstack((x,y)).T
+
+# Function to plot posterior density over r (i.e. correlation coefficient)
+def plotPosteriorOverR(y,trace,show=False):
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.scatter(y[:,0],y[:,1])
+    plt.subplot(2,1,2)
+    plotPosteriorDistribution(trace.get_values('r'), show=False)
+    rValue = stats.pearsonr(y[:,0],y[:,1])[0]
+    plt.plot((rValue,rValue), plt.gca().get_ylim()) # Plot calculated Pearson correlation coefficient
+    if show==True: plt.show()
+
+# Return correlated data from book
+def getBookData():
+    return np.array([.8, 102, 1,98, .5,100, 0.9,105, .7,103, 0.4,110, 1.2,99, 1.4,87, 0.6,113, 1.1,89, 1.3,93]).reshape((11, 2))
 
 # ------------------------------------------------------------
 # 5.1 Pearson correlation
@@ -31,13 +51,8 @@ that links them.
 if sectionToRun == 1:
 
     # Create linearly correlated dataset
-    def createLinearData(α, σ):
-        x = np.random.uniform(low=0, high=10, size=11)
-        y = α * x + (σ*np.random.rand(len(x)))
-        return np.vstack((x,y)).T
     y = createLinearData(α=-1, σ=3)
-    # y = np.array([.8, 102, 1,98, .5,100, 0.9,105, .7,103, 
-    #                0.4,110, 1.2,99, 1.4,87, 0.6,113, 1.1,89, 1.3,93]).reshape((11, 2)) # Data from book
+    # y = getBookData() # Data from book
 
     # Define model
     with pm.Model() as model:
@@ -56,13 +71,7 @@ if sectionToRun == 1:
         trace = pm.sample(draws=100)
 
     # Plot results
-    plt.figure()
-    plt.subplot(2,1,1)
-    plt.scatter(y[:,0],y[:,1])
-    plt.subplot(2,1,2)
-    plotPosteriorDistribution(trace.get_values('r'), show=False)
-    rValue = stats.pearsonr(y[:,0],y[:,1])[0]
-    plt.plot((rValue,rValue), plt.gca().get_ylim()) # Plot calculated Pearson correlation coefficient
+    plotPosteriorOverR(y,trace)
 
     # Plot covariance matrix posteriors
     postCov = trace.get_values('cov')
@@ -80,6 +89,48 @@ if sectionToRun == 1:
 
 # ------------------------------------------------------------
 # 5.2 Pearson correlation with uncertainty
+# ------------------------------------------------------------
+"""
+In this example, we extend the previous code to take account of possible error in the measurment of our observations.
+For example, if the two dimensions correspond to reaction times (RT) and IQ scores, we might expect that the precision
+of RT measurements is greater (as it is a physical quantity) than IQ (which is a psychological concept). Therefore, we
+may want to add this information into our model. In other words, the uncertainty in measurement should be incorporated
+in an assessment of the correlation between the variables.
+
+A simple approach for including this uncertainty is adopted in the code below. Here, the observed data still take the
+form xi = (xi1, xi2) for the ith person’s response time and IQ measure. However, these observations are now sampled from
+a Gaussian distribution, centered on the unobserved true response time and IQ of that person, denoted by yi = (yi1, yi2).
+These true values are then modeled as x was in the previous model, and drawn from a multivariate Gaussian distribution.
+The precision of the measurements is captured by λe = (λe1,λe2) of the Gaussian draws for the observed data.
+"""
+if sectionToRun == 2:
+
+    # The datasets:
+    y = getBookData()
+    λe = np.array([.03, 1]) # Uncertainty in measurement precision (i.e. RTs vs IQ; RTs are thought to have less error than IQ)
+
+    # Define the model
+    with pm.Model() as model:
+        # prior
+        r =  pm.Uniform('r', lower=-1, upper=1) # uniform prior over correlation coefficient values
+        μ = pm.Normal('μ', mu=0, tau=.001, shape=2) # mean of two variables is set to 0, with low precision
+        σ1, σ2 = pm.Gamma('σ1', alpha=.001, beta=.001), pm.Gamma('σ2', alpha=.001, beta=.001) # uninformative priors for within-variable standard deviations
+        cov = pm.Deterministic('cov', tensor.stacklists([[σ1**2, r*σ1*σ2], [r*σ1*σ2, σ2**2]])) # create covariance matrix (see section above for further details)
+        yi = pm.MvNormal('yi', mu=μ, cov=cov, shape=np.shape(y)) # unobserved, 'true' RT and IQ of each person
+        # observed
+        xi = pm.Normal('xi', mu=yi, sd=λe, observed=y) # likelihood estimate based on estimated, true RT/IQ, as well as known measurement errors
+        # inference
+        trace = pm.sample()
+
+    # Plot results
+    plotPosteriorOverR(y,trace,show=True)
+
+    # Plot graphical model
+    renderGraphicalModel(model)
+
+
+# ------------------------------------------------------------
+# 5.3 The kappa coefficient of agreement
 # ------------------------------------------------------------
 """
 """
