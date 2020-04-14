@@ -9,8 +9,9 @@ from pymc3Functions import renderGraphicalModel, plotPosteriorDistribution
 # see https://github.com/junpenglao/Bayesian-Cognitive-Modeling-in-Pymc3
 
 # Section to run
-''' 1: pearsonCorrelation; 2: pearsonCorrelationWithUncertainty; 3: kappaAoefficientOfAgreement'''
-sectionToRun = 2
+''' 1: pearsonCorrelation; 2: pearsonCorrelationWithUncertainty; 3: kappaCoefficientOfAgreement;
+    4: changeDetectionInTimeSeries'''
+sectionToRun = 4
 
 # Function to create linearly correlated dataset
 def createLinearData(α, σ):
@@ -132,5 +133,165 @@ if sectionToRun == 2:
 # ------------------------------------------------------------
 # 5.3 The kappa coefficient of agreement
 # ------------------------------------------------------------
+
+# What is the kappa coefficient?
 """
+It is often important in statistics to determine the agreement between two different decision making methods (i.e.
+inter-rater reliability). When the decisions that are made are categorical (e.g. 1 vs. 0), one can use the kappa
+coefficient of agreement. In this process, one of the decision-making methods is viwed as giving objectively true
+decisions to which the other method aspires to match. A real-world example of this kind of problem might come when
+a cheap, experimental method for medical diagnosis to some expensive, gold-standard method.
+
+To calculate the kappa coefficient, when both decision-making methods make n independent assessments, the data y take
+the form of four counts:
+ - a observations (where both methods decide 1),
+ - b observations (where the objective method decides 1 but the other method decides 0),
+ - c observations (where the objective method decides 0 but the surrogate method decides 1) and,
+ - d observations (where both methods decide 0)
+combining these counts together yields all possible observations (n = a + b + c + d)
+
+Cohen’s (1960) kappa statistic is estimated by comparing:
+- the level of observed agreement
+        po = (a+d) / n   (i.e. the proportion of observations where both methods agree)
+- the agreement that would be expected by chance alone
+        pe = (a+b)(a+c)+(b+d)(c+d) / n**2 (i.e. the overall probability for the first method to decide 1 (a+b), times the overall
+                                            probability for the second method to decide 1 (a+c), and added to this the overall
+                                            probability for the second method to decide 0 (b+d),  times the overall probability
+                                            for the first method to decide 0 (c+d))
+Specifically, kappa (κ) is calculated as follows:
+    κ = po − pe / 1−pe
+
+Kappa lies on a scale of −1 to +1, with values below 0.4 often interpreted as “poor” agreement beyond chance, values between
+0.4 and 0.75 interpreted as “fair to good” agreement beyond chance, and values above 0.75 interpreted as “excellent” agreement
+beyond chance (Landis & Koch, 1977). The key insight of kappa as a measure of agreement is its correction for chance agreement.
 """
+
+# Description of the model below
+"""
+A Bayesian version of kappa is coded below. The key latent variables are α, β, and γ:
+- α is the rate at which the gold standard method decides 1. This means (1−α) is the rate at which the gold standard method decides 0.
+- β is the rate at which the surrogate method decides 1 when the gold standard also decides 1.
+- γ is the rate at which the surrogate method decides 0 when the gold standard decides 0.
+(One can interpret β and γ as the rates of agreement of the surrogate method with the gold standard, for the 1 and 0 decisions, respectively)
+
+Using the rates α, β, and γ, it is possible to calculate the probabilities for a,b,c, and d (defined in the notes above).
+- πa = αβ (i.e. the probability that both methods will decide 1)
+- πb = α(1−β) (i.e. the probability that the gold standard will decide 1, but the surrogate will decide 0)
+- πc = (1−α)(1−γ) (i.e. the probability that the gold standard will decide 0 but the surrogate will decide 1)
+- πd = (1−α)γ  (i.e. the probability that both methods will decide 0)
+
+These probabilities, in turn, describe how the observed data, y, made up of the counts a, b, c, and d, are generated. They come from
+a multinomial distribution with n trials, where on each trial there is a πa probability of generating an 'a' count, πb probability for
+a 'b' count, and so on.
+
+So, observing the data y allows inferences to be made about the key rates α, β, and γ. In turn, these rates help to calculate the
+following higher-order parameters:
+- ξ measures the rate of agreement (ξ = αβ + (1−α)γ)
+- ψ measures the rate of agreement that would occur by chance (ψ = (πa+πb)(πa+πc) + (πb+πd)(πc+πd))
+
+From these higher-order parameters, κ can be calculated, which is the chance-corrected measure of agreement on the −1 to +1 scale (given
+by κ = (ξ − ψ) / (1 − ψ))
+"""
+if sectionToRun == 3:
+
+    # Choose data
+    def getData(dataType):
+        if dataType=='influenza':
+            return np.array([14, 4, 5, 210])
+        elif dataType=='hearingLoss':
+            return np.array([20, 7, 103, 417])
+        elif dataType=='rareDisease':
+            return np.array([0, 0, 13, 157])
+    data = getData('influenza')
+
+    # Define model
+    with pm.Model() as model:
+        # prior
+        α = pm.Beta('α', alpha=1, beta=1)
+        β = pm.Beta('β', alpha=1, beta=1)
+        γ = pm.Beta('γ', alpha=1, beta=1)
+        # derived measures
+        πa,πb,πc,πd = α*β, α*(1-β), (1-α)*(1-γ), (1-α)*γ # a,b,c,d
+        ξ = pm.Deterministic('ξ', (α*β+(1-α)*γ)) # rate of agreement
+        ψ = pm.Deterministic('ψ', (πa+πb)*(πa+πc)+(πb+πd)*(πc+πd)) # rate of agreement that would occur by chance
+        κ = pm.Deterministic('κ', (ξ-ψ)/(1-ψ)) # chance-corrected rate of agreement
+        # observed
+        y = pm.Multinomial('y', n=data.sum(), p=[πa, πb, πc, πd], observed=data)
+        # inference
+        trace=pm.sample()
+
+    # Plot α, β, γ
+    plt.figure()
+    for i,string in enumerate(['α','β','γ']):
+        plt.subplot(3,1,i+1)
+        plotPosteriorDistribution(trace.get_values(string), show=False)
+        plt.title(string)
+    plt.show()
+    # α_calc = (data[0]+data[1])/np.sum(data)
+    # β_calc = data[0]/np.sum(data)
+    # γ_calc = data[3]/np.sum(data)
+
+    # Plot (kappa) estimate
+    def getKappEstimate(data):
+        n = data.sum()
+        p0 = (data[0]+data[3])/n
+        pe = (((data[0]+data[1]) * (data[0]+data[2])) + ((data[1]+data[3]) * (data[2]+data[3]))) / n**2
+        return (p0-pe) / (1-pe) # Cohen's point estimate
+    plt.figure()
+    kappa_Cohen = getKappEstimate(data)
+    plotPosteriorDistribution(trace.get_values('κ'), show=False)
+    plt.plot([kappa_Cohen,kappa_Cohen], plt.gca().get_ylim())
+    plt.show()
+
+    # Plot graphical model
+    renderGraphicalModel(model)
+
+# ------------------------------------------------------------
+# 5.4 Change detection in time series data
+# ------------------------------------------------------------
+"""
+An interesting use of Bayesian modelling is to detect a change occurs in noisy time series. In the code below, we generate time-series
+data in which, while the standard deviation remains constant throughout, the mean suddenly changes at some point. The goal of the
+analysis is to calculate from the data the posterior probability over when this change in mean activity occured.
+
+In order to model this problem, we assume (correctly as we made the data!) that the data come from a Gaussian distribution that always has
+the same variance, but changes its mean at one specific point in time. The observed data are the counts ci at time ti for the ith sample.
+The unobserved variable τ is the time at which the change happens, which controls whether the counts have mean μ1 or μ2. A uniform prior
+over the full range of possible times is assumed for the change point, and generic weakly informative priors are given to the means (μ) and
+the precision (λ).
+
+Note the use of the pm.math.switch() function here, which returns μ1 when the sample index is less than τ (i.e. the estimated time of change),
+and returns μ1 when the sample index is greater than τ.
+"""
+if sectionToRun == 4:
+
+    # Load data
+    def getTimeShiftData(μ1, μ2, timepoints):
+        changeTime = int(np.random.uniform(low=int(.3*timepoints),high=int(.7*timepoints)))
+        data_preChange = μ1 + np.random.randn(changeTime)
+        data_postChange = μ2 + np.random.randn(timepoints-changeTime)
+        return np.hstack((data_preChange, data_postChange))
+    data = getTimeShiftData(μ1=3, μ2=1, timepoints=500)
+    n = np.size(data)
+    sample = np.arange(0, n)
+
+    # Define model
+    with pm.Model() as model:
+        # priors
+        μ = pm.Normal('μ', mu=0, tau=.001, shape=2) # note shape =2, thus this equals μ1 and μ2
+        λ = pm.Gamma('λ', alpha=.001, beta=.001)
+        τ = pm.DiscreteUniform('τ', lower=0, upper=n) # discrete, uniform prior over all possible change times
+        μvect = pm.math.switch(sample<=τ, μ[0], μ[1]) # mu[0] for samples less than tau, mu10] for samples greater than tau 
+        # observed
+        ci = pm.Normal('ci', mu=μvect, tau=λ, observed=data)
+        # inference
+        trace = pm.sample()
+
+    # Plot results
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(data)
+    plt.subplot(2,1,2)
+    plotPosteriorDistribution(trace.get_values('τ'), x=np.linspace(0,n,100), show=False)
+    plt.ylim([0,1])
+    plt.show()
