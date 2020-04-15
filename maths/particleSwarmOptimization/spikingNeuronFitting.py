@@ -30,7 +30,7 @@ initialParameters = {'tau_w': 20*ms, 'a': 4*nS, 'b': 0.5*nA, 'Vr': VT+5*mV} # Bu
 neurons.set_states(initialParameters)
 trace = StateMonitor(neurons, 'u', record=True)
 spikes = SpikeMonitor(neurons)
-neurons.u = EL
+neurons.u = -55*mV
 neurons.w = 0
 neurons.I = 2*nA
 store()
@@ -41,7 +41,7 @@ def runNetwork(parameters):
     restore()
     neurons.set_states(parameters)
     run(simulationDuration)
-    return trace.u[0]/mV, spikes.t_
+    return np.copy(trace.u[0]/mV), np.copy(spikes.t_)
 
 # Get initial data
 initialTrace, initialSpikes = runNetwork(initialParameters)
@@ -54,7 +54,7 @@ initialTrace, initialSpikes = runNetwork(initialParameters)
 numberOfParticles = 50
 
 # State priors (i.e. particle starting distributions)
-parameterRanges = {'tau_w': (0,300), 'a': (-12,4), 'b': (0.,.6)}#,'Vr': (-80,-30)} # Variable parameter priors
+parameterRanges = {'tau_w': (0,300), 'a': (0,4), 'b': (0.,.6)}#,'Vr': (-60,-50)} # Variable parameter priors
 priors = np.zeros(shape=(numberOfParticles,len(parameterRanges)))
 for i, param in enumerate(parameterRanges):
     low, high = parameterRanges[param]
@@ -68,9 +68,10 @@ def getParmaters(params):
 
 # Create optimizer
 '''c1: cognitive parameter, c2: social parameter, w: inertia parameter (hyperparameters)'''
-options = {'c1':0.5, 'c2':0.3, 'w':0.9}
-optimizer = ps.single.GlobalBestPSO(n_particles=numberOfParticles, dimensions=len(parameterRanges), options=options, init_pos=priors)
-
+# options = {'c1':0.5, 'c2':0.3, 'w':0.5}
+# optimizer = ps.single.GlobalBestPSO(n_particles=numberOfParticles, dimensions=len(parameterRanges), options=options, init_pos=priors)
+options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 3, 'p': 2}
+optimizer = ps.single.LocalBestPSO(n_particles=numberOfParticles, dimensions=len(parameterRanges), options=options, init_pos=priors)
 
 # -----------------------------------------------------
 # Fitness functions
@@ -87,13 +88,18 @@ def getR2(initialData, currentData):
     linearFit = stats.linregress(initialData,currentData)
     return -linearFit.rvalue # take negative R^2 value
 
+# Get spike count difference
+def spikeCountDifference(initialSpikes, currentSpikes):
+    countRatio = (len(currentSpikes)/len(initialSpikes))
+    return -(stats.norm.pdf(countRatio,loc=1,scale=1) / stats.norm.pdf(1,loc=1,scale=1))# return the highest number when the ratio is close to 1
+
 # Get fitness function
 def fitnessFunction(x):
     fitnessValues = np.zeros(shape=len(x))
     for i, params in enumerate(x): # Loop over a values
         currentTrace, currentSpikes = runNetwork(getParmaters(params))
         # fitnessValues[i] = gammaFactor(currentSpikes, initialSpikes)
-        fitnessValues[i] = getR2(initialTrace, currentTrace)
+        fitnessValues[i] = getR2(initialTrace, currentTrace) + spikeCountDifference(initialSpikes, currentSpikes)
     return fitnessValues
 
 
