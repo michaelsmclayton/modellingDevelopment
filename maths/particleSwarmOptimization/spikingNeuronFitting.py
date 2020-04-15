@@ -24,6 +24,7 @@ C = 281*pF; gL = 30*nS; EL = -70.6*mV; VT = -50.4*mV; deltaT = 2*mV; Vcut = VT+5
 
 # Create neurons
 neurons = NeuronGroup(N=1, model=adexModel, threshold='u>Vcut', reset="u=Vr; w+=b", method='euler')
+# initialParameters = {'tau_w': 144*ms, 'a': 4*nS, 'b': 0.0805*nA, 'Vr': EL} # Regular spiking
 initialParameters = {'tau_w': 20*ms, 'a': 4*nS, 'b': 0.5*nA, 'Vr': VT+5*mV} # Bursting
 # initialParameters = {'tau_w': 144*ms, 'a': 2*C/(144*ms), 'b': 0.0*nA, 'Vr': -70.6*mV} # Fast spiking
 neurons.set_states(initialParameters)
@@ -53,26 +54,22 @@ initialTrace, initialSpikes = runNetwork(initialParameters)
 numberOfParticles = 50
 
 # State priors (i.e. particle starting distributions)
-variableParameters = { # Variable parameter priors
-    'tau_w': (0,300),
-    'a': (-12,4),
-    'b': (0,120)} #
-    # 'Vr': (-60,-40)}
-priors = np.zeros(shape=(numberOfParticles,len(variableParameters)))
-for i, param in enumerate(variableParameters):
-    low,high = variableParameters[param]
+parameterRanges = {'tau_w': (0,300), 'a': (-12,4), 'b': (0.,.6)}#,'Vr': (-80,-30)} # Variable parameter priors
+priors = np.zeros(shape=(numberOfParticles,len(parameterRanges)))
+for i, param in enumerate(parameterRanges):
+    low, high = parameterRanges[param]
     priors[:,i] = np.random.uniform(low=low,high=high, size=numberOfParticles)
-    # mean,std,unit = variableParameters[param]
+    # mean,std,unit = parameterRanges[param]
     # priors[:,i] = stats.norm.rvs(size=numberOfParticles, loc=mean, scale=std)
 
 # Function to get parameters
 def getParmaters(params):
-    return {'tau_w': params[0]*ms, 'a': params[1]*nS}#, 'b': params[2]*nA, 'Vr': params[3]*mV}
+    return {'tau_w': params[0]*ms, 'a': params[1]*nS, 'b': params[2]*nA}#, 'Vr': params[3]*mV}
 
 # Create optimizer
 '''c1: cognitive parameter, c2: social parameter, w: inertia parameter (hyperparameters)'''
 options = {'c1':0.5, 'c2':0.3, 'w':0.9}
-optimizer = ps.single.GlobalBestPSO(n_particles=numberOfParticles, dimensions=len(variableParameters), options=options, init_pos=priors)
+optimizer = ps.single.GlobalBestPSO(n_particles=numberOfParticles, dimensions=len(parameterRanges), options=options, init_pos=priors)
 
 
 # -----------------------------------------------------
@@ -110,6 +107,7 @@ cost, pos = optimizer.optimize(fitnessFunction, 20)
 # Plot results
 plt.figure()
 plt.plot(initialTrace)
+print(getParmaters(pos))
 resultTrace, resultSpikes = runNetwork(getParmaters(pos))
 plt.plot(resultTrace, alpha=.5)
 plt.show()
