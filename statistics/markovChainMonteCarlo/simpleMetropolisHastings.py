@@ -29,6 +29,14 @@ def getProposalAndJumpingDistributions(mu,sig):
     jumpingProbs = lambda positions : np.prod([getJumpProbs(position[0],position[1])/getJumpProbs(position[1],position[0]) for position in positions])
     return proposalDistribution, jumpingProbs
 proposalDistribution, jumpingProbs = getProposalAndJumpingDistributions(mu=0,sig=4)
+'''Note here that, in additon to the proposal distribution, we also create a function called 'jumpingProbs'. This function returns the
+probability of jumping from the current point to the next point, divided by probability of jumping from the next point to the current point
+(i..e the ratio between these two). When the proposal distribution is totally symmetric over all of parameters space (i.e. it is equally
+likely to jump from current to next as from next to current), this jumping ratio equals 1 and it does not affect the calculation (see
+jumpingProbs(positions) in code below). However, if the proposal distribution is asymmetric, such when a next point cannot be
+less than 0, meaning that the is a bias towards sampling values greater than 0, this ratio can be used to correct for this bias.
+This correction is a defining feature of the Metropolis-Hastings algorithm (in contrast to the Metropolis algorithm)
+(see https://youtu.be/rxImfvwpWLA for further explanation)'''
 
 # Metropolis-Hastings
 steps = 20000
