@@ -23,10 +23,15 @@ targetDistribution = getLikelihood(xRange,yRange)
 # plt.imshow(targetDistribution); plt.show()
 
 # Proposal distribution
-proposalDistribution = lambda : stats.norm.rvs(loc=0,scale=4)
+def getProposalAndJumpingDistributions(mu,sig):
+    proposalDistribution = lambda : stats.norm.rvs(loc=mu,scale=sig)
+    getJumpProbs = lambda fromVal, toVal: stats.norm.pdf(toVal, loc=fromVal,scale=sig)
+    jumpingProbs = lambda positions : np.prod([getJumpProbs(position[0],position[1])/getJumpProbs(position[1],position[0]) for position in positions])
+    return proposalDistribution, jumpingProbs
+proposalDistribution, jumpingProbs = getProposalAndJumpingDistributions(mu=0,sig=4)
 
 # Metropolis-Hastings
-steps = 15000
+steps = 20000
 params = np.zeros(shape=(steps,2))
 currentX, currentY = np.random.uniform(low=0,high=100,size=2)
 print('Running Metropolis-Hastings MCMC algorithm...')
@@ -35,10 +40,11 @@ for step in tqdm(range(steps)):
     currentLikelihood = getLikelihood([currentX],[currentY])
     # Get next location
     nextX, nextY = currentX+proposalDistribution(), currentY+proposalDistribution()
+    positions = [[currentX,nextX],[currentY,nextY]]
     # Get proposed, next likelihood
     nextLikelihood = getLikelihood([nextX],[nextY])
     # Get likelihood ratio
-    ratio = nextLikelihood/currentLikelihood
+    ratio = (nextLikelihood / currentLikelihood) * jumpingProbs(positions)
     # Generate uniform random number [0,1]
     r = np.random.uniform()
     # Change mu if r < ratio
