@@ -79,9 +79,22 @@ can be referred to using Betti number:
     - b0 is the number of connected components
     - b1 is the number of one-dimensional or "circular" holes
     - b2 is the number of two-dimensional "voids" or "cavities"
-In this script, you will see that, when the data is a 2D ring, there is a h1 dot that has a signficantly higher
-death value than the diagonal line (indicating persistent homology, and the presence of a circular hole in the data).
-However, when the data is a sphere, there is an h2 dot that has a signficantly higher death value than the diagonal
-line (indicating persistent homology, and the presence of a void (or cavity) hole in the data). In contrast to both,
-when data is taken from a torus, there is evidence of both a b1 and b2 holes 
+In this script, you will see that, when the data form clusters, there are h0 dots that have significantly higher
+death value than the diagonal line (indicating persistent homology, and the presence of clusters in the data). The
+number of these dots should be equal to the number of clusters. Alternatively, when the data is a 2D ring, there is a
+h1 dot that has a signficantly higher death value than the diagonal line (indicating persistent homology, and the
+presence of a circular hole in the data). However, when the data is a sphere, there is an h2 dot that has a signficantly
+higher death value than the diagonal line (indicating persistent homology, and the presence of a void (or cavity) hole in
+the data). In contrast to both, when data is taken from a torus, there is evidence of both a b1 and b2 holes.
 '''
+
+# # 3d sphere
+# def sphereSample():
+#     vec = np.random.uniform(-1,1,3)
+#     vec /= np.linalg.norm(vec)
+#     return vec
+# data = np.array([sphereSample() for i in range(100)])
+# fig = plt.figure()
+# ax1 = fig.add_subplot(111, projection='3d')
+# ax1.scatter(data[:,0],data[:,1],data[:,2])
+# plt.show()
