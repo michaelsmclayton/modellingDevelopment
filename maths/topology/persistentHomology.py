@@ -47,6 +47,18 @@ def clusterSamples(nOfClusters):
     data = np.reshape(np.array(data), (pointsPerCluster*nOfClusters,2))
     return data
 
+def sampleGridWithHole():
+    dots = []
+    xRange = np.arange(-3,3.5,step=.5)
+    x,y = np.meshgrid(xRange,xRange)
+    x = np.reshape(x,(len(x)**2))
+    y = np.reshape(y,(len(y)**2))
+    for i in range(len(x)):
+        curX, curY = x[i], y[i]
+        vec = np.array([curX,curY])
+        if np.linalg.norm(vec)>2:
+            dots.append([curX, curY])
+    return np.array(dots)
 
 
 # -------------------------------------------------
@@ -55,7 +67,7 @@ def clusterSamples(nOfClusters):
 
 # Create data
 x = np.random.uniform(low=0,high=2*np.pi,size=nPoints)
-data = clusterSamples(5) # circleSample(), sphereSample(), torusSample
+data = circleSample() # circleSample(), sphereSample(), torusSample, clusterSamples(5), sampleGridWithHole()
 
 # Analyse topology
 diagrams = ripser(data, maxdim=data.shape[1]-1)['dgms']
@@ -86,6 +98,10 @@ h1 dot that has a signficantly higher death value than the diagonal line (indica
 presence of a circular hole in the data). However, when the data is a sphere, there is an h2 dot that has a signficantly
 higher death value than the diagonal line (indicating persistent homology, and the presence of a void (or cavity) hole in
 the data). In contrast to both, when data is taken from a torus, there is evidence of both a b1 and b2 holes.
+
+It is also interesting to note that a grid of dots with a hole in the middle behaves quite similarly to a ring. In other
+words, they both reveal the presence of a h1 dot (and therefore a circular hole). However, it is an important reminder than,
+just because you see an h1 dot, doesn't necessary mean that the data are best described by a ring. 
 '''
 
 # # 3d sphere
