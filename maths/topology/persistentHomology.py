@@ -38,13 +38,24 @@ def torusSample(r=1, R=3, x0=0, y0=0, z0=0):
     z = z0 + r * sinu
     return np.array([x, y, z]).T
 
+def clusterSamples(nOfClusters):
+    data = []
+    pointsPerCluster = int(nPoints/nOfClusters)
+    clusterLocations = np.random.uniform(low=-50,high=50,size=(nOfClusters,2))
+    for c in range(nOfClusters):
+        data.append(clusterLocations[c,:]+np.random.randn(pointsPerCluster,2))
+    data = np.reshape(np.array(data), (pointsPerCluster*nOfClusters,2))
+    return data
+
+
+
 # -------------------------------------------------
 # Create data and analyse topology
 # -------------------------------------------------
 
 # Create data
 x = np.random.uniform(low=0,high=2*np.pi,size=nPoints)
-data = torusSample() # circleSample(), sphereSample(), torusSample
+data = clusterSamples(5) # circleSample(), sphereSample(), torusSample
 
 # Analyse topology
 diagrams = ripser(data, maxdim=data.shape[1]-1)['dgms']
